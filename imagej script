@@ -1,0 +1,204 @@
+/*
+  
+This is a script made in imageJ for segmenting human body parts from infrared images. 
+After segmentation (based on morphology and signal intensity), several measurements are performed, such as antropometrical variables (eg.limb width) and temperature (siganl intensity) of different body segments. 
+
+Date of start: 01.06.2018
+Last edition: 01.06.2018
+
+coded by Vasco Fachada
+supervised by Mika Silvennoinen
+project:  
+*/
+
+
+
+
+
+start = getTime(); 
+
+
+
+
+
+//Batch open image data - waiting
+//setBatchMode("hide");
+
+
+//setting and calibration
+rename("original");
+run("Duplicate...", "title=bin_original");
+
+//Binarizing and cropping
+run("Subtract Background...", "rolling=90");
+setThreshold(0, 46);
+run("Convert to Mask");
+run("Invert");
+run("Create Selection");
+run("Enlarge...", "enlarge=15");
+selectWindow("original");
+run("Restore Selection");
+run("Crop");
+run("Duplicate...", "title=stk_seg_masks");
+run("RGB Color");
+selectWindow("bin_original");
+run("Crop");
+ 
+//skeletonizing
+run("Duplicate...", "title=skeletoid");
+run("Select None");
+run("Skeletonize");
+run("Dilate");
+
+//making quadrants and classinfying according to body segment
+selectWindow("skeletoid");
+
+	//head
+run("Duplicate...", "title=skeletoid_head");
+setBackgroundColor(255, 255, 255); 
+
+getDimensions(width, height, channels, slices, frames);
+x_local=(width/2)-(20/2);
+y_local=(height*0.05);
+makeRectangle(x_local, y_local, 20, 20, 10);
+run("Clear Outside");
+run("Select None");
+run("Create Selection");
+List.setMeasurements;
+headSeed_x=List.getValue("X");
+headSeed_y=List.getValue("Y");
+selectWindow("original");
+run("Restore Selection");
+run("Level Sets", "method=[Active Contours] use_level_sets grey_value_threshold=1 distance_threshold=0.05 advection=5 propagation=0.50 curvature=0.40 grayscale=5 convergence=0.0050 region=outside");
+selectWindow("Segmentation of original");
+rename("stk_head");
+run("Create Selection"); 
+selectWindow("original");
+run("Select None");
+selectWindow("stk_head");
+run("Select None");
+run("Invert");
+run("Restore Selection");
+run("RGB Color");
+setForegroundColor(255, 0, 229);
+head_color = getValue("rgb.foreground");
+print (head_color);
+run("Fill", "slice");
+run("Select None");
+
+
+
+
+	
+	//feft foot - "lO"
+selectWindow("skeletoid");
+run("Duplicate...", "title=skeletoid_lFoot");
+setBackgroundColor(255, 255, 255); 
+
+getDimensions(width, height, channels, slices, frames);
+x_local=(width/2)+(20/2);
+y_local=(height*0.90);
+makeRectangle(x_local, y_local, 20, 20, 10);
+run("Clear Outside");
+run("Select None");
+run("Create Selection");
+List.setMeasurements;
+lFootSeed_x=List.getValue("X");
+lFootSeed_y=List.getValue("Y");
+selectWindow("original");
+run("Restore Selection");
+run("Level Sets", "method=[Active Contours] use_level_sets grey_value_threshold=1 distance_threshold=0.05 advection=5 propagation=0.50 curvature=0.40 grayscale=5 convergence=0.0050 region=outside");
+selectWindow("Segmentation of original");
+rename("stk_lFoot");
+run("Create Selection"); 
+selectWindow("original");
+run("Select None");
+selectWindow("stk_lFoot");
+run("Select None");
+run("Invert");
+run("Restore Selection");
+run("RGB Color");
+setForegroundColor(255, 0, 0);
+lFoot_color = getValue("rgb.foreground");
+print (lFoot_color);
+run("Fill", "slice");
+run("Select None");
+
+
+
+//Assembling final images with different segments
+run("Images to Stack", "name=seg_masks title=stk keep");
+run("Z Project...", "projection=[Standard Deviation]");
+rename("just_masks_");
+selectWindow("seg_masks");
+run("Z Project...", "start=2 projection=[Standard Deviation]");
+rename("just_masks");
+run("Images to Stack", "method=[Copy (center)] name=mont title=just_masks keep");
+run("Make Montage...", "columns=2 rows=1 scale=1 last=2");
+run("In [+]");
+run("In [+]");
+//setBatchMode("show");
+
+
+
+
+
+
+Dialog.create("SEGMENTATION COMPLETED");
+items = newArray("Yes, this is good enough!", "Not really, I want to edit");
+Dialog.addRadioButtonGroup("Are you satisfied with the current segmentation results? \n \n", items, 2, 1, "Yes, this is good enough!");
+Dialog.show;
+print("Choice: "+Dialog.getRadioButton);
+
+
+Dialog.create(head_color);
+
+
+items = newArray(head_color, lFoot_color, "Paris", "Tokyo");
+Dialog.addChoice("label", items, "Paris");
+Dialog.show;
+
+//Selecting the body segment to edit
+setTool("dropper");
+waitForUser("Segment selection", "click on the segment you want to edit, then press 'OK'.");
+current_foreground = getValue("rgb.foreground");
+if (current_foreground==head_color){
+	showMessage("this is the head");
+	setTool("Paintbrush Tool");
+	run("Paintbrush Tool Options...", "brush=2");
+	selectWindow("just_masks_");
+	run("Duplicate...", "title=just_masks_temp");
+	selectWindow("just_masks_temp");
+	run("Set... ", "zoom=600 x="+(headSeed_x)+" y="+(headSeed_y)); 
+	waitForUser("Editing Segment", "Press 'OK' after you finished your editing.");
+	doWand(headSeed_x, headSeed_y);
+	selectWindow("stk_head");
+	doWand(headSeed_x, headSeed_y);
+	setBackgroundColor(0, 0, 0);
+	run("Clear", "slice");
+	run("Restore Selection");
+	setForegroundColor(255, 0, 229);
+	run("Fill", "slice");}
+	
+else if (current_foreground==lFoot_color){
+	showMessage("this is the left foot")}
+else if (type==10){
+      print("point selection")}
+else{
+      print("line selection")}
+
+ 
+
+
+x=100; y=200; 
+  call("ij.gui.WaitForUserDialog.setNextLocation",x,y); 
+  waitForUser("DONE!!!!!!! It took "+(getTime()-start)/1000/60+" MINUTES or "+(getTime()-start)/1000/60/60+" HOURS... This means you need to upgrade this machine ;)"); 
+
+/*
+while (nImages>0) { 
+         selectImage(nImages); 
+         close(); 
+}
+*/
+
+
